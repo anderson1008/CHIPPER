@@ -424,27 +424,27 @@ Boolean TPZSimpleRouterFlowBless :: inputReading()
    bool swapEnable [4] = {};
    cleanOutputInterfaces();
 
-   swapEnable[0] = permuterBlock (m_pipeReg1[1], m_pipeReg1[2], 1);
-   swapEnable[1] = permuterBlock (m_pipeReg1[3], m_pipeReg1[4], 1);
+   swapEnable[0] = permuterBlock (m_pipeReg1[4], m_pipeReg1[2], 1);
+   swapEnable[1] = permuterBlock (m_pipeReg1[3], m_pipeReg1[1], 1);
    if (swapEnable[0]==true)
    {
       m_interFlit[1] = m_pipeReg1[2];
-      m_interFlit[2] = m_pipeReg1[1];
+      m_interFlit[2] = m_pipeReg1[4];
    }
    else
    {
-      m_interFlit[1] = m_pipeReg1[1];
+      m_interFlit[1] = m_pipeReg1[4];
       m_interFlit[2] = m_pipeReg1[2];
    }
    if (swapEnable[1]==true)
    {
-      m_interFlit[3] = m_pipeReg1[4];
+      m_interFlit[3] = m_pipeReg1[1];
       m_interFlit[4] = m_pipeReg1[3];
    }
    else
    {
       m_interFlit[3] = m_pipeReg1[3];
-      m_interFlit[4] = m_pipeReg1[4];
+      m_interFlit[4] = m_pipeReg1[1];
    }
 //   swapFlit (m_pipeReg1[0],m_pipeReg1[1],&(m_interFlit[0]),&(m_interFlit[1]),swapEnable[0]);
 //   swapFlit (m_pipeReg1[2],m_pipeReg1[3],&m_interFlit[2],&m_interFlit[3],swapEnable[1]);
