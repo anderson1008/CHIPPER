@@ -17,9 +17,12 @@ DEBUG =                    #Enables debugger ready exec (empty to disable)
 HOST_TYPE := $(shell uname -m)
 
 ifeq ($(shell uname),Darwin)
-   CC =/opt/local/bin/g++-mp-4.4
-   OPTS = -O6 -Wno-deprecated 
-   OPTS_DEBUG = -Wno-deprecated  -ggdb -g 
+#   CC =/opt/local/bin/g++-mp-4.4
+#   OPTS = -O6 -Wno-deprecated 
+#   OPTS_DEBUG = -Wno-deprecated  -ggdb -g 
+    CC=g++
+    OPTS = -O3  -fPIC -Wno-deprecated -m64  -march=opteron -g3
+    OPTS_DEBUG=  -fPIC -ggdb -Wno-deprecated  -g  -m64  -march=opteron
 else
 ifeq ($(HOST_TYPE),i686)
    CC = g++
@@ -53,7 +56,9 @@ ifdef DEBUG
    DEBUG_DIX = _debug
 endif
 
-
+#    CC=g++
+#    OPTS = -O6  -fPIC -Wno-deprecated -m64  -march=opteron -g3
+#    OPTS_DEBUG=  -fPIC -ggdb -Wno-deprecated  -g  -m64  -march=opteron
 
 LIBS += -lm
 PATH_INC  = ../inc  $(INC1) 

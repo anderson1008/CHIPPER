@@ -713,8 +713,8 @@ TPZString TPZSimulation :: writeSimulationStatus()
 	     TPZString("\n");
 
 	     buffer += TPZString("***************************  Power  Consumption ******************* \n");
-             double m_goldenCounterDynamicPower = 9.72/5; // in uW / s (10^9 cycles)
-             double m_perDCDynamicPower = 3000/5;  // uW per DC per second
+             double m_goldenCounterDynamicPower = 9.72/5/2; // in uW / s (10^9 cycles)
+             double m_perDCDynamicPower = 3000/5/2;  // uW per DC per second
              double m_goldenCounterLeakage = 4.4;
              double m_perDCLeakage = 78.51;
              double m_frequency = 1;   // 1GHz Frequency
