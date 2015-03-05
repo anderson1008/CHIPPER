@@ -223,7 +223,7 @@ public:
 		m_lastMissRouted=flag;
 	}
 
-    // Anderson: may use to manipulate the header
+    // Anderson: overall traversed distance
 	void incDistance() {
 		m_distance++;
 	}

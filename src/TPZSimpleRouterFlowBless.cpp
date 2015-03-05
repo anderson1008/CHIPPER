@@ -191,6 +191,286 @@ void TPZSimpleRouterFlowBless :: terminate()
 }
 
 
+
+
+
+//*************************************************************************
+//:
+//  f: virtual Boolean inputReading();
+//
+//  d:
+//:
+//*************************************************************************
+Boolean TPZSimpleRouterFlowBless :: inputReading()
+{
+   #ifdef DEBUG
+   cout << endl << endl << "TIME = ";
+   TPZString texto = TPZString(getOwnerRouter().getCurrentTime()) + " @ " + getComponent().asString();
+   cout << texto << endl;
+   #endif // DEBUG
+
+   unsigned outPort;
+   unsigned inPort;
+
+   //**********************************************************************************************************
+   // PART3: Permutation Network
+   //**********************************************************************************************************
+
+   bool swapEnable [4] = {};
+   cleanOutputInterfaces();
+
+   swapEnable[0] = permuterBlock (m_pipeReg1[4], m_pipeReg1[2], 1);
+   swapEnable[1] = permuterBlock (m_pipeReg1[3], m_pipeReg1[1], 1);
+   if (swapEnable[0]==true)
+   {
+      m_interFlit[1] = m_pipeReg1[2];
+      m_interFlit[2] = m_pipeReg1[4];
+   }
+   else
+   {
+      m_interFlit[1] = m_pipeReg1[4];
+      m_interFlit[2] = m_pipeReg1[2];
+   }
+   if (swapEnable[1]==true)
+   {
+      m_interFlit[3] = m_pipeReg1[1];
+      m_interFlit[4] = m_pipeReg1[3];
+   }
+   else
+   {
+      m_interFlit[3] = m_pipeReg1[3];
+      m_interFlit[4] = m_pipeReg1[1];
+   }
+//   swapFlit (m_pipeReg1[0],m_pipeReg1[1],&(m_interFlit[0]),&(m_interFlit[1]),swapEnable[0]);
+//   swapFlit (m_pipeReg1[2],m_pipeReg1[3],&m_interFlit[2],&m_interFlit[3],swapEnable[1]);
+   for (inPort=1; inPort<m_ports; inPort++)
+      m_pipeReg1[inPort] = 0;
+
+   swapEnable[2] = permuterBlock (m_interFlit[1], m_interFlit[3], 2);
+   swapEnable[3] = permuterBlock (m_interFlit[2], m_interFlit[4], 2);
+//   swapFlit (m_interFlit[0],m_interFlit[2],m_outFlit[0],m_outFlit[1],swapEnable[2]);
+//   swapFlit (m_interFlit[1],m_interFlit[3],m_outFlit[2],m_outFlit[3],swapEnable[3]);
+   if (swapEnable[2]==true)
+   {
+      m_outFlit[1] = m_interFlit[3];
+      m_outFlit[2] = m_interFlit[1];
+   }
+   else
+   {
+      m_outFlit[1] = m_interFlit[1];
+      m_outFlit[2] = m_interFlit[3];
+   }
+   if (swapEnable[3]==true)
+   {
+      m_outFlit[3] = m_interFlit[4];
+      m_outFlit[4] = m_interFlit[2];
+   }
+   else
+   {
+      m_outFlit[3] = m_interFlit[2];
+      m_outFlit[4] = m_interFlit[4];
+   }
+
+   for (inPort=1; inPort<m_ports; inPort++)
+      m_interFlit[inPort] = 0;
+
+   for (outPort=1; outPort<m_ports; outPort++)
+   {
+      if (m_outFlit[outPort])
+      {
+         m_outFlit[outPort]->clearGolden(); // calculate at each node.
+         /// m_outFlit is directly connected to outPorts.
+         /*
+            Direction   outPort   m_outFlit
+            East        1           3
+            West        2           4
+            North       3           1
+            South       4           2
+         */
+         switch (outPort)
+         {
+            case 1:   
+                     if (m_outFlit[outPort]->getRoutingPort() != _Yplus_)
+                        ((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount(TPZNetwork::Deflection);
+                     outputInterfaz(3)->sendData(m_outFlit[1]); // Send to North
+                     break;
+                   
+            case 2:   
+                     if (m_outFlit[outPort]->getRoutingPort() != _Yminus_)
+                        ((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount(TPZNetwork::Deflection);
+                     outputInterfaz(4)->sendData(m_outFlit[2]); // Send to South
+                        break;
+            case 3:  
+                     if (m_outFlit[outPort]->getRoutingPort() != _Xplus_)
+                        ((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount(TPZNetwork::Deflection);
+                     outputInterfaz(1)->sendData(m_outFlit[3]); // Send to East
+                        break;
+            case 4:   
+                     if (m_outFlit[outPort]->getRoutingPort() != _Xminus_)
+                        ((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount(TPZNetwork::Deflection);
+                     outputInterfaz(2)->sendData(m_outFlit[4]); // Send to West
+                        break;
+         }
+         
+         // Determine if deflection occur
+         //if (outPort != m_outFlit[outPort]->getRoutingPort())
+         m_outFlit[outPort] = 0;
+         ((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount( TPZNetwork::SWTraversal);
+         //((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount( TPZNetwork::LinkTraversal);
+         //getOwnerRouter().incrLinkUtilization();
+
+      }
+   }
+
+
+
+   //**********************************************************************************************************
+   // PART1: Compute Delta Info and Set Golden Bit
+   //**********************************************************************************************************
+
+   goldenEpochSequencing (getOwnerRouter().getCurrentTime());
+
+   for( inPort = 1; inPort < m_ports; inPort++)
+   {
+      if(m_sync[inPort])
+      {
+         #ifdef DEBUG
+         cout << "Flit arrive at inPort = " << inPort << endl;
+         cout << "        PktID = " << m_sync[inPort]->getIdentifier() << endl;
+         cout << "        Flit " << m_sync[inPort]->flitNumber() << "/" << m_sync[inPort]->getPacketLength() << endl;
+         cout << "        Dest = " << m_sync[inPort]->destiny().asString() << endl;
+         #endif // DEBUG
+
+         routeComputation(m_sync[inPort]);
+         for (outPort = 1; outPort <= m_ports; outPort++)
+         {
+            if(getDeltaAbs(m_sync [inPort], outPort)==true)
+            {
+               m_sync [inPort]->setRoutingPort((TPZROUTINGTYPE) outPort);
+               break;
+            }
+         }
+         if (goldenCheck (m_sync[inPort]->getIdentifier()) == true)
+            m_sync[inPort]->setGolden();
+         else
+            m_sync[inPort]->clearGolden();
+         m_sync[inPort]->setInputInterfaz(inPort);
+         m_pipeReg1 [inPort] = m_sync[inPort];
+         m_sync[inPort]=0;
+         #ifdef DEBUG
+         cout << "Flit successfully stored in pipeReg1 = " << inPort << endl;
+         cout << "        PktID = " << m_pipeReg1[inPort]->getIdentifier() << endl;
+         cout << "        Flit " << m_pipeReg1[inPort]->flitNumber() << "/" << m_pipeReg1[inPort]->getPacketLength() << endl;
+         cout << "        Dest = " << m_pipeReg1[inPort]->destiny().asString() << endl;
+         if (m_pipeReg1[inPort]->getGolden())
+            cout << "        This flit is golden." << endl;
+         else
+            cout << "        This flit is not golden." << endl;
+         #endif // DEBUG
+      }
+   }
+
+    //**********************************************************************************************************
+   //  Eject - Ejection Kill - Injection
+   //**********************************************************************************************************
+
+   for( inPort = 1; inPort < m_ports; inPort++)
+   {
+      m_eject[inPort] = false; // reset it.
+      if (m_pipeReg1 [inPort])
+         if(m_pipeReg1[inPort] -> getRoutingPort() == _LocalNode_)
+            m_eject[inPort] = true;
+   }
+   TPZMessage * msgEject;
+   msgEject = ejector ();
+   if (msgEject)
+   {
+      outputInterfaz(m_ports)->sendData(msgEject);
+      m_pipeReg1 [msgEject->getInputInterfaz()] = 0; // ejector kill to remove the ejected msg.
+   }
+
+   //    check the local injection and put the flit into injection queue.
+   //    The injection queue should reside in NI.
+   //*********************************************************************************************************
+   if(m_sync[m_ports])
+   {
+      #ifdef DEBUG
+      cout<< "Flit " << m_sync[m_ports]->flitNumber() << "/" << m_sync[m_ports]->getPacketLength() <<" of Pkt " << m_sync[m_ports]->getIdentifier() << " at NI OutPort" << endl;
+      #endif // DEBUG
+      m_injectionQueue.enqueue(m_sync[m_ports]);
+      m_sync[inPort]=0;
+   }
+
+   if(m_injectionQueue.numberOfElements() !=0)
+   {
+      for ( inPort = 1; inPort < m_ports; inPort++)
+      {
+         if(m_pipeReg1[inPort] == 0)
+         {
+            m_injectionQueue.dequeue(m_pipeReg1[inPort]); // Anderson: construct a outstanding msg.
+            #ifdef DEBUG
+            cout<< "Flit " << m_pipeReg1[inPort]->flitNumber() << "/" << m_pipeReg1[inPort]->getPacketLength() <<" of Pkt "\
+             << m_pipeReg1[inPort]->getIdentifier() << " is injected to inPort =" << inPort << endl;
+            #endif // DEBUG
+
+            routeComputation(m_pipeReg1[inPort]);
+            for (outPort = 1; outPort < m_ports; outPort++) // no need to check local outPort
+            {
+               if(getDeltaAbs(m_pipeReg1[inPort], outPort)==true)
+               {
+                  m_pipeReg1 [inPort]->setRoutingPort((TPZROUTINGTYPE) outPort);
+                  #ifdef DEBUG
+                  cout << "    Desired output port = " << outPort << endl;
+                  #endif // DEBUG
+                  break;
+               }
+            }
+            if (goldenCheck (m_pipeReg1[inPort]->getIdentifier()) == true)
+            {
+               m_pipeReg1[inPort]->setGolden();
+               #ifdef DEBUG
+               cout << "    This flit is golden." << endl;
+               #endif // DEBUG
+            }
+            else
+            {
+               m_pipeReg1[inPort]->clearGolden();
+               #ifdef DEBUG
+               cout << "    This flit is NOT golden." << endl;
+               #endif // DEBUG
+            }
+            m_pipeReg1[inPort]->setInputInterfaz(inPort);
+            break;
+         }
+      }
+   }
+
+   // if the injection condition is not satisfied, need to stop injection by sending STOP to the local interfaz.
+   if (m_injectionQueue.numberOfElements() !=0) inputInterfaz(m_ports)->sendStopRightNow();
+   else inputInterfaz(m_ports)->clearStopRightNow();
+   /*
+   for ( inPort = 1; inPort < m_ports; inPort++)
+   {
+      if (m_pipeReg1[inPort] != 0)
+      {
+         m_pipeReg2[inPort] = m_pipeReg1[inPort];
+         m_pipeReg1[inPort] = 0;
+      }
+   }
+   */
+   return true;
+}
+
+
+
+
+
+
+
+
+
+
+
 void TPZSimpleRouterFlowBless :: goldenEpochSequencing (unsigned time)
 {
    unsigned Epoch = networkSize*routerDelay + 4;
@@ -396,257 +676,6 @@ Boolean TPZSimpleRouterFlowBless :: routeComputation(TPZMessage* msg)
    msg->setDelta(deltaX,0);
    msg->setDelta(deltaY,1);
    msg->setDelta(deltaZ,2);
-   return true;
-}
-
-//*************************************************************************
-//:
-//  f: virtual Boolean inputReading();
-//
-//  d:
-//:
-//*************************************************************************
-Boolean TPZSimpleRouterFlowBless :: inputReading()
-{
-   #ifdef DEBUG
-   cout << endl << endl << "TIME = ";
-   TPZString texto = TPZString(getOwnerRouter().getCurrentTime()) + " @ " + getComponent().asString();
-   cout << texto << endl;
-   #endif // DEBUG
-
-   unsigned outPort;
-   unsigned inPort;
-
-   //**********************************************************************************************************
-   // PART3: Permutation Network
-   //**********************************************************************************************************
-
-   bool swapEnable [4] = {};
-   cleanOutputInterfaces();
-
-   swapEnable[0] = permuterBlock (m_pipeReg1[4], m_pipeReg1[2], 1);
-   swapEnable[1] = permuterBlock (m_pipeReg1[3], m_pipeReg1[1], 1);
-   if (swapEnable[0]==true)
-   {
-      m_interFlit[1] = m_pipeReg1[2];
-      m_interFlit[2] = m_pipeReg1[4];
-   }
-   else
-   {
-      m_interFlit[1] = m_pipeReg1[4];
-      m_interFlit[2] = m_pipeReg1[2];
-   }
-   if (swapEnable[1]==true)
-   {
-      m_interFlit[3] = m_pipeReg1[1];
-      m_interFlit[4] = m_pipeReg1[3];
-   }
-   else
-   {
-      m_interFlit[3] = m_pipeReg1[3];
-      m_interFlit[4] = m_pipeReg1[1];
-   }
-//   swapFlit (m_pipeReg1[0],m_pipeReg1[1],&(m_interFlit[0]),&(m_interFlit[1]),swapEnable[0]);
-//   swapFlit (m_pipeReg1[2],m_pipeReg1[3],&m_interFlit[2],&m_interFlit[3],swapEnable[1]);
-   for (inPort=1; inPort<m_ports; inPort++)
-      m_pipeReg1[inPort] = 0;
-
-   swapEnable[2] = permuterBlock (m_interFlit[1], m_interFlit[3], 2);
-   swapEnable[3] = permuterBlock (m_interFlit[2], m_interFlit[4], 2);
-//   swapFlit (m_interFlit[0],m_interFlit[2],m_outFlit[0],m_outFlit[1],swapEnable[2]);
-//   swapFlit (m_interFlit[1],m_interFlit[3],m_outFlit[2],m_outFlit[3],swapEnable[3]);
-   if (swapEnable[2]==true)
-   {
-      m_outFlit[1] = m_interFlit[3];
-      m_outFlit[2] = m_interFlit[1];
-   }
-   else
-   {
-      m_outFlit[1] = m_interFlit[1];
-      m_outFlit[2] = m_interFlit[3];
-   }
-   if (swapEnable[3]==true)
-   {
-      m_outFlit[3] = m_interFlit[4];
-      m_outFlit[4] = m_interFlit[2];
-   }
-   else
-   {
-      m_outFlit[3] = m_interFlit[2];
-      m_outFlit[4] = m_interFlit[4];
-   }
-
-   for (inPort=1; inPort<m_ports; inPort++)
-      m_interFlit[inPort] = 0;
-
-   for (outPort=1; outPort<m_ports; outPort++)
-   {
-      if (m_outFlit[outPort])
-      {
-         m_outFlit[outPort]->clearGolden(); // calculate at each node.
-         /// m_outFlit is directly connected to outPorts.
-         /*
-            Direction   outPort   m_outFlit
-            East        1           3
-            West        2           4
-            North       3           1
-            South       4           2
-         */
-         switch (outPort)
-         {
-            case 1:   outputInterfaz(3)->sendData(m_outFlit[1]); // Send to North
-                        break;
-            case 2:   outputInterfaz(4)->sendData(m_outFlit[2]); // Send to South
-                        break;
-            case 3:   outputInterfaz(1)->sendData(m_outFlit[3]); // Send to East
-                        break;
-            case 4:   outputInterfaz(2)->sendData(m_outFlit[4]); // Send to West
-                        break;
-         }
-         m_outFlit[outPort] = 0;
-         ((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount( TPZNetwork::SWTraversal);
-         //((TPZNetwork*)(getOwnerRouter().getOwner()))->incrEventCount( TPZNetwork::LinkTraversal);
-         //getOwnerRouter().incrLinkUtilization();
-
-      }
-   }
-
-
-
-   //**********************************************************************************************************
-   // PART1: Compute Delta Info and Set Golden Bit
-   //**********************************************************************************************************
-
-   goldenEpochSequencing (getOwnerRouter().getCurrentTime());
-
-   for( inPort = 1; inPort < m_ports; inPort++)
-   {
-      if(m_sync[inPort])
-      {
-         #ifdef DEBUG
-         cout << "Flit arrive at inPort = " << inPort << endl;
-         cout << "        PktID = " << m_sync[inPort]->getIdentifier() << endl;
-         cout << "        Flit " << m_sync[inPort]->flitNumber() << "/" << m_sync[inPort]->getPacketLength() << endl;
-         cout << "        Dest = " << m_sync[inPort]->destiny().asString() << endl;
-         #endif // DEBUG
-
-         routeComputation(m_sync[inPort]);
-         for (outPort = 1; outPort <= m_ports; outPort++)
-         {
-            if(getDeltaAbs(m_sync [inPort], outPort)==true)
-            {
-               m_sync [inPort]->setRoutingPort((TPZROUTINGTYPE) outPort);
-               break;
-            }
-         }
-         if (goldenCheck (m_sync[inPort]->getIdentifier()) == true)
-            m_sync[inPort]->setGolden();
-         else
-            m_sync[inPort]->clearGolden();
-         m_sync[inPort]->setInputInterfaz(inPort);
-         m_pipeReg1 [inPort] = m_sync[inPort];
-         m_sync[inPort]=0;
-         #ifdef DEBUG
-         cout << "Flit successfully stored in pipeReg1 = " << inPort << endl;
-         cout << "        PktID = " << m_pipeReg1[inPort]->getIdentifier() << endl;
-         cout << "        Flit " << m_pipeReg1[inPort]->flitNumber() << "/" << m_pipeReg1[inPort]->getPacketLength() << endl;
-         cout << "        Dest = " << m_pipeReg1[inPort]->destiny().asString() << endl;
-         if (m_pipeReg1[inPort]->getGolden())
-            cout << "        This flit is golden." << endl;
-         else
-            cout << "        This flit is not golden." << endl;
-         #endif // DEBUG
-      }
-   }
-
-    //**********************************************************************************************************
-   //  Eject - Ejection Kill - Injection
-   //**********************************************************************************************************
-
-   for( inPort = 1; inPort < m_ports; inPort++)
-   {
-      m_eject[inPort] = false; // reset it.
-      if (m_pipeReg1 [inPort])
-         if(m_pipeReg1[inPort] -> getRoutingPort() == _LocalNode_)
-            m_eject[inPort] = true;
-   }
-   TPZMessage * msgEject;
-   msgEject = ejector ();
-   if (msgEject)
-   {
-      outputInterfaz(m_ports)->sendData(msgEject);
-      m_pipeReg1 [msgEject->getInputInterfaz()] = 0; // ejector kill to remove the ejected msg.
-   }
-
-   //    check the local injection and put the flit into injection queue.
-   //    The injection queue should reside in NI.
-   //*********************************************************************************************************
-   if(m_sync[m_ports])
-   {
-      #ifdef DEBUG
-      cout<< "Flit " << m_sync[m_ports]->flitNumber() << "/" << m_sync[m_ports]->getPacketLength() <<" of Pkt " << m_sync[m_ports]->getIdentifier() << " at NI OutPort" << endl;
-      #endif // DEBUG
-      m_injectionQueue.enqueue(m_sync[m_ports]);
-      m_sync[inPort]=0;
-   }
-
-   if(m_injectionQueue.numberOfElements() !=0)
-   {
-      for ( inPort = 1; inPort < m_ports; inPort++)
-      {
-         if(m_pipeReg1[inPort] == 0)
-         {
-            m_injectionQueue.dequeue(m_pipeReg1[inPort]); // Anderson: construct a outstanding msg.
-            #ifdef DEBUG
-            cout<< "Flit " << m_pipeReg1[inPort]->flitNumber() << "/" << m_pipeReg1[inPort]->getPacketLength() <<" of Pkt "\
-             << m_pipeReg1[inPort]->getIdentifier() << " is injected to inPort =" << inPort << endl;
-            #endif // DEBUG
-
-            routeComputation(m_pipeReg1[inPort]);
-            for (outPort = 1; outPort < m_ports; outPort++) // no need to check local outPort
-            {
-               if(getDeltaAbs(m_pipeReg1[inPort], outPort)==true)
-               {
-                  m_pipeReg1 [inPort]->setRoutingPort((TPZROUTINGTYPE) outPort);
-                  #ifdef DEBUG
-                  cout << "    Desired output port = " << outPort << endl;
-                  #endif // DEBUG
-                  break;
-               }
-            }
-            if (goldenCheck (m_pipeReg1[inPort]->getIdentifier()) == true)
-            {
-               m_pipeReg1[inPort]->setGolden();
-               #ifdef DEBUG
-               cout << "    This flit is golden." << endl;
-               #endif // DEBUG
-            }
-            else
-            {
-               m_pipeReg1[inPort]->clearGolden();
-               #ifdef DEBUG
-               cout << "    This flit is NOT golden." << endl;
-               #endif // DEBUG
-            }
-            m_pipeReg1[inPort]->setInputInterfaz(inPort);
-            break;
-         }
-      }
-   }
-
-   // if the injection condition is not satisfied, need to stop injection by sending STOP to the local interfaz.
-   if (m_injectionQueue.numberOfElements() !=0) inputInterfaz(m_ports)->sendStopRightNow();
-   else inputInterfaz(m_ports)->clearStopRightNow();
-   /*
-   for ( inPort = 1; inPort < m_ports; inPort++)
-   {
-      if (m_pipeReg1[inPort] != 0)
-      {
-         m_pipeReg2[inPort] = m_pipeReg1[inPort];
-         m_pipeReg1[inPort] = 0;
-      }
-   }
-   */
    return true;
 }
 

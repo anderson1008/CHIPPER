@@ -116,7 +116,7 @@
 
       enum { Flit, Packet, Message };
       typedef enum { BufferWrite, BufferRead, VCArbitration, SWArbitration, SWTraversal, IStageTraversal,
-                     OStageTraversal, MPTraversal, LinkTraversal, RouterBypass} TPZTipoEvento;
+                     OStageTraversal, MPTraversal, LinkTraversal, RouterBypass, Deflection} TPZTipoEvento;
 
       TPZNetwork( const TPZComponentId& id,
                   const TPZString& routerId,
@@ -128,6 +128,8 @@
       // Anderson
       void increHeadTailCount ();
       unsigned getHeadTailCount ();
+      void incrementMinimalDistance (TPZPosition org, TPZPosition dst);
+      unsigned long getTotalMinimalDistance ();
 
       // end Anderson
 
@@ -423,6 +425,7 @@
 
       // Anderson
       unsigned         m_num_head_tail;
+      unsigned long    m_totalMinimalDistance;
 
 #ifdef PTOPAZ
       TPZVectorMessages          m_MessagesEscape;
@@ -499,6 +502,7 @@
       double  m_OStageTraversal;
       double  m_MPTraversal;
       double  m_RouterBypass;
+      double  m_Deflection;
       //******************************************************************
       //END OF ADDITION
       //******************************************************************

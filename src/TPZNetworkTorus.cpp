@@ -219,7 +219,7 @@ void TPZNetworkTorus :: routingRecord( const TPZPosition& org,
    deltaY = deltaPos.valueForCoordinate(TPZPosition::Y);
    deltaZ = deltaPos.valueForCoordinate(TPZPosition::Z);
 
-   int total=deltaX+deltaY+deltaZ;
+   int total=deltaX+deltaY+deltaZ; // Anderson: looks like no use;
 
    int absDeltaX = (deltaX>0) ? deltaX : -deltaX;
    int absDeltaY = (deltaY>0) ? deltaY : -deltaY;

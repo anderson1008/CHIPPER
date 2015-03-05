@@ -179,11 +179,11 @@ TPZNetwork::TPZNetwork(const TPZComponentId& id, const TPZString& routerId,
             m_BufferWrite(0), m_BufferRead(0), m_VCArbitration(0),
             m_SWArbitration(0), m_SWTraversal(0), m_LinkTraversal(0),
 	    m_RouterBypass(0), m_IStageTraversal(0), m_OStageTraversal(0),
-	    m_MPTraversal(0),
+	    m_MPTraversal(0),m_Deflection(0),
             m_ProtocolMessagesRx(0), m_ProtocolAverageDistance(0),
             m_ProtocolMessagesDelayTotal(0), m_ProtocolMessagesDelayNetwork(0),
             m_ProtocolMessagesDelayBuffer(0), m_ProtocolMaxMessagesLatency(0),
-            m_inicial(0)
+            m_inicial(0),m_totalMinimalDistance(0)
 {
     m_RouterMatrix = new TPZRouterMatrix(m_SizeX, m_SizeY, m_SizeZ);
     m_RouterMatrix->initialize(0);
@@ -411,6 +411,64 @@ void TPZNetwork::postInitialize() {
    m_PacketsTx=0;
    m_FlitsTx=0;
 }
+
+
+// begin Anderson
+
+void TPZNetwork::incrementMinimalDistance (TPZPosition org, TPZPosition dst)
+{
+   TPZPosition deltaPos = dst - org;
+   int deltaX = deltaPos.valueForCoordinate(TPZPosition::X);
+   int deltaY = deltaPos.valueForCoordinate(TPZPosition::Y);
+   int deltaZ = deltaPos.valueForCoordinate(TPZPosition::Z);
+
+   unsigned absDeltaX = (deltaX>0) ? deltaX : -deltaX;
+   unsigned absDeltaY = (deltaY>0) ? deltaY : -deltaY;
+   unsigned absDeltaZ = (deltaZ>0) ? deltaZ : -deltaZ;
+   
+   /// The following need to be changed if Topology is not Torus.
+   // begin Change
+   int R2x = int(getSizeX()/2);
+   int R2y = int(getSizeY()/2);
+   int R2z = int(getSizeZ()/2);
+
+   // A: perform routing here.
+   //    since Torus has wrap-around links, need to choose the shortest path.
+   //     drand48()<0.5 && !ordered -> if two direction are equivalent, choose one randomly.
+   if( (absDeltaX > R2x) ||
+       ((absDeltaX==R2x) && (getSizeX()%2==0)) )
+   {
+      deltaX = (deltaX>0) ? (deltaX-getSizeX()) : (deltaX+getSizeX());
+   }
+
+   if( (absDeltaY > R2y) ||
+       ((absDeltaY==R2y) && (getSizeY()%2==0)) )
+   {
+      deltaY = (deltaY>0) ? (deltaY-getSizeY()) : (deltaY+getSizeY());
+   }
+
+   if( (absDeltaZ > R2z) ||
+       ((absDeltaZ==R2z) && (getSizeZ()%2==0)) )
+   {
+      deltaZ = (deltaZ>0) ? (deltaZ-getSizeZ()) : (deltaZ+getSizeZ());
+   }
+   
+   absDeltaX = (deltaX>0) ? deltaX : -deltaX;
+   absDeltaY = (deltaY>0) ? deltaY : -deltaY;
+   absDeltaZ = (deltaZ>0) ? deltaZ : -deltaZ;
+   // end Change
+   
+   unsigned long total=absDeltaX+absDeltaY+absDeltaZ; 
+   m_totalMinimalDistance = m_totalMinimalDistance + total;
+}
+
+unsigned long TPZNetwork::getTotalMinimalDistance ()
+{
+   return m_totalMinimalDistance;
+}
+
+// End Anderson
+
 
 //*************************************************************************
 //:
@@ -735,7 +793,7 @@ Boolean TPZNetwork::sendMessage(TPZMessage* msg) {
     incrProtocolMessagesTx(unsigned(indice));
 
     router->sendMessage(msg);
-
+    incrementMinimalDistance(source,destin); // add by Anderson
     incrementTx(Message);
     incrementTx(Packet, msg->messageSize());
     incrementTx(Flit, msg->messageSize()*msg->packetSize());
@@ -2595,6 +2653,9 @@ void TPZNetwork :: incrEventCount( TPZTipoEvento evento)
      case MPTraversal:
          m_MPTraversal++;
      return;
+     case Deflection:
+         m_Deflection++;
+     return;
    }
 }
 
@@ -2638,6 +2699,9 @@ double TPZNetwork :: getEventCount( TPZTipoEvento evento)
 
       case MPTraversal:
          return m_MPTraversal;
+         
+      case Deflection:
+         return m_Deflection;
    }
 }
 //*************************************************************************

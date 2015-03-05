@@ -640,8 +640,14 @@ TPZString TPZSimulation :: writeSimulationStatus()
    double latMediaPaqNetwork = m_Network->getNetworkDelay(TPZNetwork::Packet) / double(m_Network->getPacketsRx());
 
    double latMediaPaqBuffer = m_Network->getBufferDelay(TPZNetwork::Packet) / double(m_Network->getPacketsRx());
-
-   double distanciaMedia = double(m_Network->getTotalDistance()) / double(m_Network->getMessagesRx());
+   
+   // Anderson:
+   // deflection rate = TotalDistance - TotalMinimalDistance/MessageRx 
+   unsigned long totalDistance = m_Network->getTotalDistance();
+   unsigned long miniTotalDistance = m_Network->getTotalMinimalDistance();
+   double deflectionRate = double(totalDistance-miniTotalDistance)/double(m_Network->getMessagesTx()); // uninjected pkt will reduce the value. Unit hops / flit;
+   
+   double distanciaMedia = double(totalDistance) / double(m_Network->getMessagesRx()); 
 
    double cargaAplicadaFC  = (double)m_Network->getFlitsTx()/(double)(m_Clock-m_resetStats);
 
@@ -678,22 +684,24 @@ TPZString TPZSimulation :: writeSimulationStatus()
              TPZString("\n Cycles simulated        = ") + TPZString(m_Clock) +
              TPZString("\n Cycles deprecated       = ") + TPZString(m_resetStats) +
              TPZString("\n Buffers size            = ") + TPZString(globalData().routerBufferSize()) +
-             TPZString("\n Messages length         = ") + TPZString(m_MessageLength) + " packet(s)" +
-             TPZString("\n Packets length          = ") + TPZString(m_PacketLength) + " flits" +
+             TPZString("\n Messages length         = ") + TPZString(m_MessageLength) + //" packet(s)" +
+             TPZString("\n Packets length          = ") + TPZString(m_PacketLength) + //" flits" +
+             TPZString("\n Load                    = ") + TPZString(m_q*m_PacketLength) + //" flits/node/cycle" +
+             
 	     TPZString("\n************************ PERFORMANCE ***********************") +
-             TPZString("\n Supply Thr. Norm        = ") + TPZString(cargaAplicadaNormalizada) + " flits/cycle/router " +
-             TPZString("\n Accept Thr. Norm        = ") + TPZString(throughputNormalizado) + " f/c/r (m: "
-                                                       + TPZString(minimoInjectadoNormalizado)+ ", M:" +
-                                                       + TPZString(maximoInjectadoNormalizado) +")"+
-             TPZString("\n Supply Thr.             = ") + TPZString(cargaAplicadaFC) + " f/c" +
-             TPZString("\n Throughput              = ") + TPZString(throughput) + " f/c (m: "
-                                                       + TPZString(minimoInjectado)+ ", M:" +
-                                                       + TPZString(maximoInjectado) +")"+
+             TPZString("\n Supply Thr. Norm        = ") + TPZString(cargaAplicadaNormalizada) + //" flits/cycle/router " +
+             TPZString("\n Accept Thr. Norm        = ") + TPZString(throughputNormalizado) + //" f/c/r (m: "
+                                                       + TPZString(minimoInjectadoNormalizado)+ //", M:" +
+                                                       //+ TPZString(maximoInjectadoNormalizado) +")"+
+             TPZString("\n Supply Thr.             = ") + TPZString(cargaAplicadaFC) + //" f/c" +
+             TPZString("\n Throughput              = ") + TPZString(throughput) + //" f/c (m: "
+                                                       //+ TPZString(minimoInjectado)+ ", M:" +
+                                                       //+ TPZString(maximoInjectado) +")"+
              TPZString("\n Average Distance        = ") + TPZString(distanciaMedia) +
              TPZString("\n Messages generated      = ") + TPZString(m_Network->getMessagesTx()) +
              TPZString("\n Messages received       = ") + TPZString(m_Network->getMessagesRx()) +
              TPZString("\n Messages to inject      = ") + TPZString(m_Network->getMessagesToTx()) +
-	     TPZString("\n Messages on Escape      = ") + TPZString(m_Network->getMessagesEscape()) +
+             TPZString("\n Messages on Escape      = ") + TPZString(m_Network->getMessagesEscape()) +
              TPZString("\n Total message latency   = ") + TPZString(latMediaMsgTotal) +
              TPZString("\n Network message latency = ") + TPZString(latMediaMsgNetwork) +
              TPZString("\n Buffer message latency  = ") + TPZString(latMediaMsgBuffer) +
@@ -707,8 +715,11 @@ TPZString TPZSimulation :: writeSimulationStatus()
              TPZString("\n VC Arbitrations         = ") + TPZString(m_Network->getEventCount( TPZNetwork::VCArbitration))+
              TPZString("\n SW Arbitrations         = ") + TPZString(m_Network->getEventCount( TPZNetwork::SWArbitration))+
              TPZString("\n SW Traversal            = ") + TPZString(m_Network->getEventCount( TPZNetwork::SWTraversal))+
-	     TPZString("\n Router Bypass           = ") + TPZString(m_Network->getEventCount( TPZNetwork::RouterBypass))+
+             TPZString("\n Router Bypass           = ") + TPZString(m_Network->getEventCount( TPZNetwork::RouterBypass))+
              TPZString("\n Link Traversal          = ") + TPZString(m_Network->getEventCount( TPZNetwork::LinkTraversal))+
+             TPZString("\n Deflection              = ") + TPZString(m_Network->getEventCount( TPZNetwork::Deflection))+
+             TPZString("\n Deflection Rate         = ") + TPZString(deflectionRate)+ 
+             
 	     TPZString("\n\n**********************************************************")+
 	     TPZString("\n");
 
@@ -726,9 +737,9 @@ TPZString TPZSimulation :: writeSimulationStatus()
 
              double m_overallPower = m_overallDynamicPower + m_overallStaticPower;
 
-             buffer += TPZString("OverallPower               =       ") + TPZString(m_overallPower/1000000) + TPZString(" W \n");
-             buffer += TPZString("Dynamic Power accounts for         ") + TPZString(m_overallDynamicPower/m_overallPower*100) + TPZString(" % \n");
-             buffer += TPZString("Leakage Power accounts for         ") + TPZString(m_overallStaticPower/m_overallPower*100) + TPZString(" % \n");
+             buffer += TPZString("OverallPower               =       ") + TPZString(m_overallPower/1000000); // Watte
+             buffer += TPZString("\nDynamic Power             =         ") + TPZString(m_overallDynamicPower/m_overallPower*100) + TPZString(" % \n");
+             buffer += TPZString("Leakage Power               =        ") + TPZString(m_overallStaticPower/m_overallPower*100) + TPZString(" % \n");
 
 	     //****************************************************************************************************************************
              // VERBOSITY=1

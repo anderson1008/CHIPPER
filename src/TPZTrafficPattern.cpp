@@ -160,18 +160,18 @@ void TPZTrafficPattern::generateMessages(double q)
    for (register int i=0; i<m_SizeX; i++)
       for (register int j=0; j<m_SizeY; j++)
          for (register int k=0; k<m_SizeZ; k++) 
-	 {
+            {
             TPZPosition pos(i, j, k);
             if (getSimulation().getisRafagaMode()) 
-	    {
+            {
                if (drand48() < getInjectFactor(pos)*q && getSimulation().getStopSimulMessages()!=0) 
                {
                   injectMessage(pos);
                   getSimulation().decrStopSimulMessages();
                }
             } 
-	    else 
-	    {
+            else 
+            {
                if (drand48() < getInjectFactor(pos)*q) 
                {
                   injectMessage(pos);

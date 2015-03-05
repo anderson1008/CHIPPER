@@ -421,7 +421,7 @@
       unsigned           m_verbosity;
       unsigned           m_Radius;
       unsigned           m_flitSize;
-      double             m_q;
+      double             m_q; // Anderson: load?
       double             m_defaultLoad;
       double             m_defaultProb;
       Boolean            m_ShowState;
